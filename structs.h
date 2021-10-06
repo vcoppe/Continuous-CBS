@@ -429,4 +429,17 @@ public:
     }
 };
 
+struct Box {
+    double min[3], max[3];
+
+    Box(double min_i, double min_j, double min_t, double max_i, double max_j, double max_t) {
+        min[0] = min_i;
+        min[1] = min_j;
+        min[2] = min_t;
+        max[0] = max_i;
+        max[1] = max_j;
+        max[2] = max_t;
+    }
+};
+
 #endif // STRUCTS_H

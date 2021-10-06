@@ -403,7 +403,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
             time_now = std::chrono::high_resolution_clock::now();
             find_new_conflicts(map, task, left, paths, pathB, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
             time_spent = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - time_now);
-            time += time_spent.count();           
+            time += time_spent.count();
             if(left.cost > 0)
             {
                 left.h = get_hl_heuristic(left.cardinal_conflicts);
@@ -645,30 +645,88 @@ Conflict CBS::check_paths(const sPath &pathA, const sPath &pathB)
     return Conflict();
 }
 
+Box CBS::get_box(Move move) {
+    return Box(
+        std::min(map->get_i(move.id1), map->get_i(move.id2)) - CN_AGENT_SIZE,
+        std::min(map->get_j(move.id1), map->get_j(move.id2)) - CN_AGENT_SIZE,
+        move.t1,
+        std::max(map->get_i(move.id1), map->get_i(move.id2)) + CN_AGENT_SIZE,
+        std::max(map->get_j(move.id1), map->get_j(move.id2)) + CN_AGENT_SIZE,
+        move.t2
+    );
+}
+
 std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, int id)
 {
-    std::vector<Conflict> conflicts;
-    //check all agents
-    if(id < 0)
-        for(unsigned int i = 0; i < paths.size(); i++)
-            for(unsigned int j = i + 1; j < paths.size(); j++)
-            {
-                Conflict conflict = check_paths(paths[i], paths[j]);
-                if(conflict.agent1 >= 0)
-                    conflicts.push_back(conflict);
+    unsigned int n = paths.size();
+    r_tree.RemoveAll();
+    std::vector<std::vector<Move>> moves(n, std::vector<Move>());
+
+    if (id >= 0) {
+        for (unsigned int i=0; i<n; i++) if (int(i) != id) {
+            auto nodes = paths[i].nodes;
+            for (unsigned int j=0; j<nodes.size(); j++) {
+                auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
+                auto box1 = get_box(move1);
+                r_tree.Insert(box1.min, box1.max, i + n * j);
+                moves[i].push_back(move1);
             }
-    else
-    {
-        for(unsigned int i = 0; i < paths.size(); i++)
-        {
-            if(int(i) == id)
-                continue;
-            Conflict conflict = check_paths(paths[i], paths[id]);
-            if(conflict.agent1 >= 0)
-                conflicts.push_back(conflict);
         }
+
+        std::unordered_map<int,Conflict> conflicts;
+
+        auto nodes = paths[id].nodes;
+        for (unsigned int j=0; j<nodes.size(); j++) {
+            auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
+            auto box1 = get_box(move1);
+            r_tree.Search(box1.min, box1.max, [&](int k){
+                if (int(k % n) == id) return true; // this agent
+                auto move2 = moves[k % n][k / n];
+                double t = std::min(move1.t1, move2.t1);
+                if ((conflicts.find(k % n) == conflicts.end() || t < conflicts[k % n].t) && check_conflict(move1, move2)) {
+                    conflicts[k % n] = Conflict(id, k % n, move1, move2, t);
+                }
+                return true;
+            });
+        }
+
+        std::vector<Conflict> all_conflicts;
+        for(auto kv : conflicts) {
+            all_conflicts.push_back(kv.second);
+        }
+
+        return all_conflicts;
+    } else {
+        std::vector<std::unordered_map<int,Conflict>> conflicts(n, std::unordered_map<int,Conflict>());
+
+        for (unsigned int i=0; i<n; i++) {
+            auto nodes = paths[i].nodes;
+            for (unsigned int j=0; j<nodes.size(); j++) {
+                auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
+                auto box1 = get_box(move1);
+                r_tree.Search(box1.min, box1.max, [&](int k){
+                    if (k % n == i) return true; // this agent
+                    auto move2 = moves[k % n][k / n];
+                    double t = std::min(move1.t1, move2.t1);
+                    if ((conflicts[i].find(k % n) == conflicts[i].end() || t < conflicts[i][k % n].t) && check_conflict(move1, move2)) {
+                        conflicts[i][k % n] = Conflict(i, k % n, move1, move2, t);
+                    }
+                    return true;
+                });
+                r_tree.Insert(box1.min, box1.max, i + n * j);
+                moves[i].push_back(move1);
+            }
+        }
+
+        std::vector<Conflict> all_conflicts;
+        for (unsigned int i=0; i<n; i++) {
+            for(auto kv : conflicts[i]) {
+                all_conflicts.push_back(kv.second);
+            }
+        }
+
+        return all_conflicts;
     }
-    return conflicts;
 }
 
 double CBS::get_cost(CBS_Node node, int agent_id)

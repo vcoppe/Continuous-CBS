@@ -9,6 +9,7 @@
 #include "heuristic.h"
 #include "simplex/simplex.h"
 #include "simplex/pilal.h"
+#include "RTree/RTree.h"
 
 class CBS
 {
@@ -32,12 +33,14 @@ public:
     double get_cost(CBS_Node node, int agent_id);
     std::vector<sPath> get_paths(CBS_Node *node, unsigned int agents_size);
     Conflict get_conflict(std::list<Conflict> &conflicts);
+    Box get_box(Move move);
     CBS_Tree tree;
     SIPP planner;
     Solution solution;
     Heuristic h_values;
     Config config;
     const Map* map;
+    RTree<int, double, 3> r_tree;
 
 };
 

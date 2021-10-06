@@ -1,9 +1,9 @@
 #ifndef CONST_H
 #define CONST_H
 
-#define CN_USE_CARDINAL  0 //1 - true, 0 - false
-#define CN_HLH_TYPE      0 // 0 - no hlh, 1 - solve lpp by simplex, 2 - greedly take disjoint conflicts
-#define CN_USE_DS        0 //1 - true, 0 - false
+#define CN_USE_CARDINAL  1 //1 - true, 0 - false
+#define CN_HLH_TYPE      2 // 0 - no hlh, 1 - solve lpp by simplex, 2 - greedly take disjoint conflicts
+#define CN_USE_DS        1 //1 - true, 0 - false
 #define CN_TIMELIMIT     30 // in seconds
 #define CN_AGENT_SIZE    sqrt(2.0)/4.0 //radius; only values in range (0; 0.5] are supported
 #define CN_CONNECTEDNESS 2 // possible variants 2,3,4,5
