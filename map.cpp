@@ -72,10 +72,6 @@ bool Map::get_grid(const char* FileName)
         value = mapnode->Value();
         std::transform(value.begin(), value.end(), value.begin(), ::tolower);
 
-        stream.str("");
-        stream.clear();
-        stream << element->GetText();
-
         if (!hasGridMem && hasHeight && hasWidth)
         {
             grid.resize(height);
@@ -86,6 +82,10 @@ bool Map::get_grid(const char* FileName)
 
         if (value == CNS_TAG_HEIGHT)
         {
+            stream.str("");
+            stream.clear();
+            stream << element->GetText();
+
             if (hasHeight)
             {
                 std::cout << "Warning! Duplicate '" << CNS_TAG_HEIGHT << "' encountered." << std::endl;
@@ -108,6 +108,10 @@ bool Map::get_grid(const char* FileName)
         }
         else if (value == CNS_TAG_WIDTH)
         {
+            stream.str("");
+            stream.clear();
+            stream << element->GetText();
+
             if (hasWidth)
             {
                 std::cout << "Warning! Duplicate '" << CNS_TAG_WIDTH << "' encountered." << std::endl;
