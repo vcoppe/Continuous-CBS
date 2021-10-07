@@ -645,49 +645,50 @@ Conflict CBS::check_paths(const sPath &pathA, const sPath &pathB)
     return Conflict();
 }
 
-Box CBS::get_box(Move move) {
-    return Box(
+box CBS::get_box(Move move) {
+    return box(point(
         std::min(map->get_i(move.id1), map->get_i(move.id2)) - CN_AGENT_SIZE,
         std::min(map->get_j(move.id1), map->get_j(move.id2)) - CN_AGENT_SIZE,
-        move.t1,
+        move.t1
+    ), point(
         std::max(map->get_i(move.id1), map->get_i(move.id2)) + CN_AGENT_SIZE,
         std::max(map->get_j(move.id1), map->get_j(move.id2)) + CN_AGENT_SIZE,
         move.t2
-    );
+    ));
 }
 
 std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, int id)
 {
     unsigned int n = paths.size();
-    r_tree.RemoveAll();
     std::vector<std::vector<Move>> moves(n, std::vector<Move>());
 
     if (id >= 0) {
+        std::vector<value> values;
         for (unsigned int i=0; i<n; i++) if (int(i) != id) {
             auto nodes = paths[i].nodes;
             for (unsigned int j=0; j<nodes.size(); j++) {
-                auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-                auto box1 = get_box(move1);
-                r_tree.Insert(box1.min, box1.max, i + n * j);
-                moves[i].push_back(move1);
+                auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
+                auto box = get_box(move);
+                moves[i].push_back(move);
+                values.emplace_back(box, i + n * j);
             }
         }
 
+        bgi::rtree<value,bgi::rstar<16>> r_tree(values);
         std::unordered_map<int,Conflict> conflicts;
 
         auto nodes = paths[id].nodes;
         for (unsigned int j=0; j<nodes.size(); j++) {
             auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-            auto box1 = get_box(move1);
-            r_tree.Search(box1.min, box1.max, [&](int k){
-                if (int(k % n) == id) return true; // this agent
+            auto box = get_box(move1);
+            r_tree.query(bgi::nearest(box, r_tree.size()) && bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
+                int k = val.second;
                 auto move2 = moves[k % n][k / n];
                 double t = std::min(move1.t1, move2.t1);
                 if ((conflicts.find(k % n) == conflicts.end() || t < conflicts[k % n].t) && check_conflict(move1, move2)) {
                     conflicts[k % n] = Conflict(id, k % n, move1, move2, t);
                 }
-                return true;
-            });
+            }));
         }
 
         std::vector<Conflict> all_conflicts;
@@ -697,23 +698,24 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
 
         return all_conflicts;
     } else {
+        bgi::rtree<value,bgi::rstar<16>> r_tree;
         std::vector<std::unordered_map<int,Conflict>> conflicts(n, std::unordered_map<int,Conflict>());
 
         for (unsigned int i=0; i<n; i++) {
             auto nodes = paths[i].nodes;
             for (unsigned int j=0; j<nodes.size(); j++) {
                 auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-                auto box1 = get_box(move1);
-                r_tree.Search(box1.min, box1.max, [&](int k){
-                    if (k % n == i) return true; // this agent
+                auto box = get_box(move1);
+                r_tree.query(bgi::nearest(box, r_tree.size()) && bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
+                    unsigned k = val.second;
+                    if (k % n == i) return; // this agent
                     auto move2 = moves[k % n][k / n];
                     double t = std::min(move1.t1, move2.t1);
                     if ((conflicts[i].find(k % n) == conflicts[i].end() || t < conflicts[i][k % n].t) && check_conflict(move1, move2)) {
                         conflicts[i][k % n] = Conflict(i, k % n, move1, move2, t);
                     }
-                    return true;
-                });
-                r_tree.Insert(box1.min, box1.max, i + n * j);
+                }));
+                r_tree.insert({box, i + n * j});
                 moves[i].push_back(move1);
             }
         }
