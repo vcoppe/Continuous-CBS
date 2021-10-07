@@ -647,13 +647,13 @@ Conflict CBS::check_paths(const sPath &pathA, const sPath &pathB)
 
 box CBS::get_box(Move move) {
     return box(point(
+        move.t1,
         std::min(map->get_i(move.id1), map->get_i(move.id2)) - CN_AGENT_SIZE,
-        std::min(map->get_j(move.id1), map->get_j(move.id2)) - CN_AGENT_SIZE,
-        move.t1
+        std::min(map->get_j(move.id1), map->get_j(move.id2)) - CN_AGENT_SIZE
     ), point(
+        move.t2,
         std::max(map->get_i(move.id1), map->get_i(move.id2)) + CN_AGENT_SIZE,
-        std::max(map->get_j(move.id1), map->get_j(move.id2)) + CN_AGENT_SIZE,
-        move.t2
+        std::max(map->get_j(move.id1), map->get_j(move.id2)) + CN_AGENT_SIZE
     ));
 }
 

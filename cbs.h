@@ -9,7 +9,6 @@
 #include "heuristic.h"
 #include "simplex/simplex.h"
 #include "simplex/pilal.h"
-#include "RTree/RTree.h"
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
 #include <boost/geometry/geometries/box.hpp>
