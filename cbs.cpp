@@ -601,50 +601,6 @@ std::list<Constraint> CBS::get_constraints(CBS_Node *node, int agent_id)
     return constraints;
 }
 
-
-Conflict CBS::check_paths(const sPath &pathA, const sPath &pathB)
-{
-    unsigned int a(0), b(0);
-    auto nodesA = pathA.nodes;
-    auto nodesB = pathB.nodes;
-    while(a < nodesA.size() - 1 || b < nodesB.size() - 1)
-    {
-        double dist = sqrt(pow(map->get_i(nodesA[a].id) - map->get_i(nodesB[b].id), 2) + pow(map->get_j(nodesA[a].id) - map->get_j(nodesB[b].id), 2)) - CN_EPSILON;
-        if(a < nodesA.size() - 1 && b < nodesB.size() - 1) // if both agents have not reached their goals yet
-        {
-            if(dist < (nodesA[a+1].g - nodesA[a].g) + (nodesB[b+1].g - nodesB[b].g))
-                if(check_conflict(Move(nodesA[a], nodesA[a+1]), Move(nodesB[b], nodesB[b+1])))
-                    return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a], nodesA[a+1]), Move(nodesB[b], nodesB[b+1]), std::min(nodesA[a].g, nodesB[b].g));
-        }
-        else if(a == nodesA.size() - 1) // if agent A has already reached the goal
-        {
-            if(dist < (nodesB[b+1].g - nodesB[b].g))
-                if(check_conflict(Move(nodesA[a].g, CN_INFINITY, nodesA[a].id, nodesA[a].id), Move(nodesB[b], nodesB[b+1])))
-                    return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a].g, CN_INFINITY, nodesA[a].id, nodesA[a].id), Move(nodesB[b], nodesB[b+1]), std::min(nodesA[a].g, nodesB[b].g));
-        }
-        else if(b == nodesB.size() - 1) // if agent B has already reached the goal
-        {
-            if(dist < (nodesA[a+1].g - nodesA[a].g))
-                if(check_conflict(Move(nodesA[a], nodesA[a+1]), Move(nodesB[b].g, CN_INFINITY, nodesB[b].id, nodesB[b].id)))
-                    return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a], nodesA[a+1]), Move(nodesB[b].g, CN_INFINITY, nodesB[b].id, nodesB[b].id), std::min(nodesA[a].g, nodesB[b].g));
-        }
-        if(a == nodesA.size() - 1)
-            b++;
-        else if(b == nodesB.size() - 1)
-            a++;
-        else if(fabs(nodesA[a+1].g - nodesB[b+1].g) < CN_EPSILON)
-        {
-            a++;
-            b++;
-        }
-        else if(nodesA[a+1].g < nodesB[b+1].g)
-            a++;
-        else if(nodesB[b+1].g - CN_EPSILON < nodesA[a+1].g)
-            b++;
-    }
-    return Conflict();
-}
-
 box CBS::get_box(Move move) {
     return box(point(
         move.t1,
