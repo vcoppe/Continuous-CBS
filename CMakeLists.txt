@@ -2,7 +2,7 @@ cmake_minimum_required( VERSION 2.8 )
 
 project( CCBS )
 
-find_package(Boost)
+find_package(Boost 1.77)
 include_directories( ${Boost_INCLUDE_DIRS} )
 include_directories( "." )
 
