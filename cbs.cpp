@@ -654,7 +654,7 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
 
         return all_conflicts;
     } else {
-        bgi::rtree<value,bgi::rstar<4>> r_tree;
+        bgi::rtree<value,bgi::quadratic<4>> r_tree;
         std::vector<std::unordered_map<int,Conflict>> conflicts(n, std::unordered_map<int,Conflict>());
 
         for (unsigned int i=0; i<n; i++) {
