@@ -637,7 +637,7 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
         for (unsigned int j=0; j<nodes.size(); j++) {
             auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
             auto box = get_box(move1);
-            r_tree.query(bgi::nearest(box, r_tree.size()) && bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
+            r_tree.query(bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
                 int k = val.second;
                 auto move2 = moves[k % n][k / n];
                 double t = std::min(move1.t1, move2.t1);
@@ -662,7 +662,7 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
             for (unsigned int j=0; j<nodes.size(); j++) {
                 auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
                 auto box = get_box(move1);
-                r_tree.query(bgi::nearest(box, r_tree.size()) && bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
+                r_tree.query(bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
                     unsigned k = val.second;
                     if (k % n == i) return; // this agent
                     auto move2 = moves[k % n][k / n];
