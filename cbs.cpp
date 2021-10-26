@@ -654,10 +654,11 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
 
         return all_conflicts;
     } else {
-        bgi::rtree<value,bgi::quadratic<4>> r_tree;
+        std::vector<value> values;
         std::vector<std::unordered_map<int,Conflict>> conflicts(n, std::unordered_map<int,Conflict>());
 
         for (unsigned int i=0; i<n; i++) {
+            bgi::rtree<value,bgi::rstar<4>> r_tree(values);
             auto nodes = paths[i].nodes;
             for (unsigned int j=0; j<nodes.size(); j++) {
                 auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
@@ -671,8 +672,8 @@ std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, in
                         conflicts[i][k % n] = Conflict(i, k % n, move1, move2, t);
                     }
                 }));
-                r_tree.insert({box, i + n * j});
                 moves[i].push_back(move1);
+                values.emplace_back(box, i + n * j);
             }
         }
 
