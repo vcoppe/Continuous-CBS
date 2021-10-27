@@ -227,10 +227,10 @@ Conflict CBS::get_conflict(std::list<Conflict> &conflicts)
     {
         if(it->overcost > 0)
         {
-            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t < it->t))
+            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t > it->t))
                 best_it = it;
         }
-        else if(best_it->t < it->t)
+        else if(best_it->t > it->t)
             best_it = it;
     }
 
@@ -403,7 +403,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
             time_now = std::chrono::high_resolution_clock::now();
             find_new_conflicts(map, task, left, paths, pathB, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
             time_spent = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - time_now);
-            time += time_spent.count();           
+            time += time_spent.count();
             if(left.cost > 0)
             {
                 left.h = get_hl_heuristic(left.cardinal_conflicts);
