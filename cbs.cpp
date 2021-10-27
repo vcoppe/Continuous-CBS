@@ -227,10 +227,10 @@ Conflict CBS::get_conflict(std::list<Conflict> &conflicts)
     {
         if(it->overcost > 0)
         {
-            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t < it->t))
+            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t > it->t))
                 best_it = it;
         }
-        else if(best_it->t < it->t)
+        else if(best_it->t > it->t)
             best_it = it;
     }
 
