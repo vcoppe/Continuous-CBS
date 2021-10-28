@@ -6,7 +6,7 @@ find_package(Boost)
 include_directories( ${Boost_INCLUDE_DIRS} )
 include_directories( "." )
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -Wall -Wextra" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O3 -DNDEBUG -Wall -Wextra" )
 
 set( SOURCE_FILES
      main.cpp
