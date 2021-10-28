@@ -9,18 +9,6 @@
 #include "heuristic.h"
 #include "simplex/simplex.h"
 #include "simplex/pilal.h"
-#include <boost/geometry.hpp>
-#include <boost/geometry/index/rtree.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/geometries/point_xyz.hpp>
-#include <boost/iterator/function_output_iterator.hpp>
-
-namespace bg = boost::geometry;
-namespace bgi = boost::geometry::index;
-
-typedef bg::model::d3::point_xyz<double> point;
-typedef bg::model::box<point> box;
-typedef std::pair<box,unsigned> value;
 
 class CBS
 {
@@ -35,14 +23,17 @@ public:
     Conflict check_paths(const sPath &pathA, const sPath &pathB);
     bool check_conflict(Move move1, Move move2);
     double get_hl_heuristic(const std::list<Conflict> &conflicts);
-    std::vector<Conflict> get_all_conflicts(const std::vector<sPath> &paths, int id);
+    Conflict get_first_conflict(const std::vector<sPath> &paths, const std::vector<RTree> &rtrees, const std::vector<std::vector<Move>> &moves, int id1, int id2);
+    std::vector<Conflict> get_all_conflicts(const std::vector<sPath> &paths, const std::vector<RTree> &rtrees, const std::vector<std::vector<Move>> &moves, int id);
     Constraint get_constraint(int agent, Move move1, Move move2);
     Constraint get_wait_constraint(int agent, Move move1, Move move2);
     void find_new_conflicts(const Map &map, const Task &task, CBS_Node &node, std::vector<sPath> &paths, const sPath &path,
+                            std::vector<RTree> &rtrees, const RTree &rtree,
+                            std::vector<std::vector<Move>> &moves, const std::vector<Move> &move,
                             const std::list<Conflict> &conflicts, const std::list<Conflict> &semicard_conflicts, const std::list<Conflict> &cardinal_conflicts,
                             int &low_level_searches, int &low_level_expanded);
     double get_cost(CBS_Node node, int agent_id);
-    std::vector<sPath> get_paths(CBS_Node *node, unsigned int agents_size);
+    void get_data(CBS_Node *node, unsigned int agents_size, std::vector<sPath> &paths, std::vector<RTree> &rtrees, std::vector<std::vector<Move>> &moves);
     Conflict get_conflict(std::list<Conflict> &conflicts);
     box get_box(Move move);
     CBS_Tree tree;

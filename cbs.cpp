@@ -13,12 +13,30 @@ bool CBS::init_root(const Map &map, const Task &task)
             return false;
         root.paths.push_back(path);
         root.cost += path.cost;
+
+        /* CREATE RTREES */
+        std::vector<value> values;
+        std::vector<Move> moves;
+
+        auto nodes = path.nodes;
+        for (unsigned int j=0; j<nodes.size(); j++) {
+            auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
+            auto box = get_box(move);
+            moves.push_back(move);
+            values.emplace_back(box, j);
+        }
+
+        bgi::rtree<value,bgi::rstar<3>> rtree(values);
+
+        root.rtrees.push_back(rtree);
+        root.moves.push_back(moves);
+        /* END OF RTREES CREATION */
     }
     root.low_level_expanded = 0;
     root.parent = nullptr;
     root.id = 1;
     root.id_str = "1";
-    auto conflicts = get_all_conflicts(root.paths, -1);
+    auto conflicts = get_all_conflicts(root.paths, root.rtrees, root.moves, -1);
     root.conflicts_num = conflicts.size();
 
     for(auto conflict: conflicts)
@@ -263,6 +281,11 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
     Conflict conflict;
     std::vector<int> conflicting_agents;
     std::vector<std::pair<int, int>> conflicting_pairs;
+    std::vector<sPath> paths;
+    std::vector<RTree> rtrees;
+    std::vector<std::vector<Move>> moves;
+    std::vector<value> values;
+    std::vector<sNode> nodes;
     int low_level_searches(0);
     int low_level_expanded(0);
     int id = 2;
@@ -274,7 +297,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         parent->conflicts.clear();
         parent->cardinal_conflicts.clear();
         parent->semicard_conflicts.clear();
-        auto paths = get_paths(&node, task.get_agents_size());
+        get_data(&node, task.get_agents_size(), paths, rtrees, moves);
 
         auto time_now = std::chrono::high_resolution_clock::now();
         conflicts = node.conflicts;
@@ -304,30 +327,50 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         Constraint constraintA(get_constraint(conflict.agent1, conflict.move1, conflict.move2));
         constraintsA.push_back(constraintA);
         sPath pathA;
-        //if(!config.use_cardinal || !config.cache_paths)
-        {
-            pathA = planner.find_path(task.get_agent(conflict.agent1), map, constraintsA, h_values);
-            low_level_searches++;
-            low_level_expanded += pathA.expanded;
+        pathA = planner.find_path(task.get_agent(conflict.agent1), map, constraintsA, h_values);
+
+        /* CREATE NEW RTREE */
+        values.clear();
+        nodes = pathA.nodes;
+        std::vector<Move> movesA;
+        for (unsigned int i=0; i<nodes.size(); i++) {
+            auto move = (i == nodes.size()-1) ? Move(nodes[i].g, CN_INFINITY, nodes[i].id, nodes[i].id) : Move(nodes[i], nodes[i+1]);
+            auto box = get_box(move);
+            movesA.push_back(move);
+            values.emplace_back(box, i);
         }
-        //else
-        //    pathA = conflict.path1;
+
+        RTree rtreeA(values);
+        /* END CREATION OF NEW RTREE */
+
+        low_level_searches++;
+        low_level_expanded += pathA.expanded;
 
         std::list<Constraint> constraintsB = get_constraints(&node, conflict.agent2);
         Constraint constraintB = get_constraint(conflict.agent2, conflict.move2, conflict.move1);
         constraintsB.push_back(constraintB);
         sPath pathB;
-        //if(!config.use_cardinal || !config.cache_paths)
-        {
-            pathB = planner.find_path(task.get_agent(conflict.agent2), map, constraintsB, h_values);
-            low_level_searches++;
-            low_level_expanded += pathB.expanded;
-        }
-        //else
-        //    pathB = conflict.path2;
+        pathB = planner.find_path(task.get_agent(conflict.agent2), map, constraintsB, h_values);
 
-        CBS_Node right({pathA}, parent, constraintA, node.cost + pathA.cost - get_cost(node, conflict.agent1), 0, node.total_cons + 1);
-        CBS_Node left({pathB}, parent, constraintB, node.cost + pathB.cost - get_cost(node, conflict.agent2), 0, node.total_cons + 1);
+        /* CREATE NEW RTREE */
+        values.clear();
+        nodes = pathB.nodes;
+        std::vector<Move> movesB;
+        for (unsigned int i=0; i<nodes.size(); i++) {
+            auto move = (i == nodes.size()-1) ? Move(nodes[i].g, CN_INFINITY, nodes[i].id, nodes[i].id) : Move(nodes[i], nodes[i+1]);
+            auto box = get_box(move);
+            movesB.push_back(move);
+            values.emplace_back(box, i);
+        }
+
+        RTree rtreeB(values);
+        /* END CREATION OF NEW RTREE */
+
+        low_level_searches++;
+        low_level_expanded += pathB.expanded;
+
+        CBS_Node right({pathA}, parent, constraintA, node.cost + pathA.cost - get_cost(node, conflict.agent1), 0, node.total_cons + 1, {rtreeA}, {movesA});
+        CBS_Node left({pathB}, parent, constraintB, node.cost + pathB.cost - get_cost(node, conflict.agent2), 0, node.total_cons + 1, {rtreeB}, {movesB});
         Constraint positive;
         bool inserted = false;
         bool left_ok = true, right_ok = true;
@@ -388,7 +431,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         if(right_ok && pathA.cost > 0 && validate_constraints(constraintsA, pathA.agentID))
         {
             time_now = std::chrono::high_resolution_clock::now();
-            find_new_conflicts(map, task, right, paths, pathA, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
+            find_new_conflicts(map, task, right, paths, pathA, rtrees, rtreeA, moves, movesA, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
             time_spent = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - time_now);
             time += time_spent.count();
             if(right.cost > 0)
@@ -401,7 +444,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         if(left_ok && pathB.cost > 0 && validate_constraints(constraintsB, pathB.agentID))
         {
             time_now = std::chrono::high_resolution_clock::now();
-            find_new_conflicts(map, task, left, paths, pathB, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
+            find_new_conflicts(map, task, left, paths, pathB, rtrees, rtreeB, moves, movesB, conflicts, semicard_conflicts, cardinal_conflicts, low_level_searches, low_level_expanded);
             time_spent = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - time_now);
             time += time_spent.count();
             if(left.cost > 0)
@@ -419,7 +462,8 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         }
     }
     while(tree.get_open_size() > 0);
-    solution.paths = get_paths(&node, task.get_agents_size());
+    get_data(&node, task.get_agents_size(), paths, rtrees, moves);
+    solution.paths = paths;
     solution.flowtime = node.cost;
     solution.low_level_expansions = low_level_searches;
     solution.low_level_expanded = double(low_level_expanded)/std::max(low_level_searches, 1);
@@ -471,13 +515,21 @@ bool CBS::validate_constraints(std::list<Constraint> constraints, int agent)
 }
 
 void CBS::find_new_conflicts(const Map &map, const Task &task, CBS_Node &node, std::vector<sPath> &paths, const sPath &path,
+                             std::vector<RTree> &rtrees, const RTree &rtree,
+                             std::vector<std::vector<Move>> &moves, const std::vector<Move> &move,
                              const std::list<Conflict> &conflicts, const std::list<Conflict> &semicard_conflicts, const std::list<Conflict> &cardinal_conflicts,
                              int &low_level_searches, int &low_level_expanded)
 {
     auto oldpath = paths[path.agentID];
+    auto oldrtree = rtrees[path.agentID];
+    auto oldmove = moves[path.agentID];
     paths[path.agentID] = path;
-    auto new_conflicts = get_all_conflicts(paths, path.agentID);
+    rtrees[path.agentID] = rtree;
+    moves[path.agentID] = move;
+    auto new_conflicts = get_all_conflicts(paths, rtrees, moves, path.agentID);
     paths[path.agentID] = oldpath;
+    rtrees[path.agentID] = oldrtree;
+    moves[path.agentID] = oldmove;
     std::list<Conflict> conflictsA({}), semicard_conflictsA({}), cardinal_conflictsA({});
     for(auto c: conflicts)
         if(c.agent1 != path.agentID && c.agent2 != path.agentID)
@@ -613,79 +665,42 @@ box CBS::get_box(Move move) {
     ));
 }
 
-std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, int id)
+Conflict CBS::get_first_conflict(const std::vector<sPath> &paths, const std::vector<RTree> &rtrees, const std::vector<std::vector<Move>> &moves, int id1, int id2) {
+    Conflict conflict;
+    for (unsigned int i=0; i<moves[id1].size(); i++) {
+        auto move1 = moves[id1][i];
+        auto box = get_box(move1);
+        rtrees[id2].query(bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
+            int k = val.second;
+            auto move2 = moves[id2][k];
+            double t = std::min(move1.t1, move2.t1);
+            if (t < conflict.t && check_conflict(move1, move2)) {
+                conflict = Conflict(id1, id2, move1, move2, t);
+            }
+        }));
+        if (conflict.t < CN_INFINITY) return conflict;
+    }
+    return conflict;
+}
+
+std::vector<Conflict> CBS::get_all_conflicts(const std::vector<sPath> &paths, const std::vector<RTree> &rtrees, const std::vector<std::vector<Move>> &moves, int id)
 {
     unsigned int n = paths.size();
-    std::vector<std::vector<Move>> moves(n, std::vector<Move>());
+    std::vector<Conflict> conflicts;
 
     if (id >= 0) {
-        std::vector<value> values;
         for (unsigned int i=0; i<n; i++) if (int(i) != id) {
-            auto nodes = paths[i].nodes;
-            for (unsigned int j=0; j<nodes.size(); j++) {
-                auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-                auto box = get_box(move);
-                moves[i].push_back(move);
-                values.emplace_back(box, i + n * j);
-            }
+            Conflict conflict = get_first_conflict(paths, rtrees, moves, id, i);
+            if (conflict.t < CN_INFINITY) conflicts.push_back(conflict);
         }
-
-        bgi::rtree<value,bgi::rstar<3>> r_tree(values);
-        std::unordered_map<int,Conflict> conflicts;
-
-        auto nodes = paths[id].nodes;
-        for (unsigned int j=0; j<nodes.size(); j++) {
-            auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-            auto box = get_box(move1);
-            r_tree.query(bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
-                int k = val.second;
-                auto move2 = moves[k % n][k / n];
-                double t = std::min(move1.t1, move2.t1);
-                if ((conflicts.find(k % n) == conflicts.end() || t < conflicts[k % n].t) && check_conflict(move1, move2)) {
-                    conflicts[k % n] = Conflict(id, k % n, move1, move2, t);
-                }
-            }));
-        }
-
-        std::vector<Conflict> all_conflicts;
-        for(auto kv : conflicts) {
-            all_conflicts.push_back(kv.second);
-        }
-
-        return all_conflicts;
     } else {
-        std::vector<value> values;
-        std::vector<std::unordered_map<int,Conflict>> conflicts(n, std::unordered_map<int,Conflict>());
-
-        for (unsigned int i=0; i<n; i++) {
-            bgi::rtree<value,bgi::rstar<3>> r_tree(values);
-            auto nodes = paths[i].nodes;
-            for (unsigned int j=0; j<nodes.size(); j++) {
-                auto move1 = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-                auto box = get_box(move1);
-                r_tree.query(bgi::intersects(box), boost::make_function_output_iterator([&](auto const& val){
-                    unsigned k = val.second;
-                    if (k % n == i) return; // this agent
-                    auto move2 = moves[k % n][k / n];
-                    double t = std::min(move1.t1, move2.t1);
-                    if ((conflicts[i].find(k % n) == conflicts[i].end() || t < conflicts[i][k % n].t) && check_conflict(move1, move2)) {
-                        conflicts[i][k % n] = Conflict(i, k % n, move1, move2, t);
-                    }
-                }));
-                moves[i].push_back(move1);
-                values.emplace_back(box, i + n * j);
-            }
+        for (unsigned int i=0; i<n; i++) for (unsigned int j=i+1; j<n; j++) {
+            Conflict conflict = get_first_conflict(paths, rtrees, moves, i, j);
+            if (conflict.t < CN_INFINITY) conflicts.push_back(conflict);
         }
-
-        std::vector<Conflict> all_conflicts;
-        for (unsigned int i=0; i<n; i++) {
-            for(auto kv : conflicts[i]) {
-                all_conflicts.push_back(kv.second);
-            }
-        }
-
-        return all_conflicts;
     }
+
+    return conflicts;
 }
 
 double CBS::get_cost(CBS_Node node, int agent_id)
@@ -699,18 +714,28 @@ double CBS::get_cost(CBS_Node node, int agent_id)
     return node.paths.at(agent_id).cost;
 }
 
-std::vector<sPath> CBS::get_paths(CBS_Node *node, unsigned int agents_size)
+void CBS::get_data(CBS_Node *node, unsigned int agents_size, std::vector<sPath> &paths, std::vector<RTree> &rtrees, std::vector<std::vector<Move>> &moves)
 {
     CBS_Node* curNode = node;
-    std::vector<sPath> paths(agents_size);
+    paths.clear();
+    paths.resize(agents_size);
+    rtrees.clear();
+    rtrees.resize(agents_size);
+    moves.clear();
+    moves.resize(agents_size);
     while(curNode->parent != nullptr)
     {
-        if(paths.at(curNode->paths.begin()->agentID).cost < 0)
+        if(paths.at(curNode->paths.begin()->agentID).cost < 0) {
             paths.at(curNode->paths.begin()->agentID) = *curNode->paths.begin();
+            rtrees.at(curNode->paths.begin()->agentID) = *curNode->rtrees.begin();
+            moves.at(curNode->paths.begin()->agentID) = *curNode->moves.begin();
+        }
         curNode = curNode->parent;
     }
     for(unsigned int i = 0; i < agents_size; i++)
-        if(paths.at(i).cost < 0)
+        if(paths.at(i).cost < 0) {
             paths.at(i) = curNode->paths.at(i);
-    return paths;
+            rtrees.at(i) = curNode->rtrees.at(i);
+            moves.at(i) = curNode->moves.at(i);
+        }
 }

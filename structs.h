@@ -14,8 +14,21 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/geometries/point_xyz.hpp>
+#include <boost/iterator/function_output_iterator.hpp>
 using boost::multi_index_container;
 using namespace boost::multi_index;
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+typedef bg::model::d3::point_xyz<double> point;
+typedef bg::model::box<point> box;
+typedef std::pair<box,unsigned> value;
+typedef bgi::rtree<value,bgi::rstar<3>> RTree;
 
 struct Agent
 {
@@ -182,8 +195,10 @@ struct CBS_Node
     std::list<Conflict> conflicts;
     std::list<Conflict> semicard_conflicts;
     std::list<Conflict> cardinal_conflicts;
-    CBS_Node(std::vector<sPath> _paths = {}, CBS_Node* _parent = nullptr, Constraint _constraint = Constraint(), double _cost = 0, int _conflicts_num = 0, int total_cons_ = 0)
-        :paths(_paths), parent(_parent), constraint(_constraint), cost(_cost), conflicts_num(_conflicts_num), total_cons(total_cons_)
+    std::vector<RTree> rtrees;
+    std::vector<std::vector<Move>> moves;
+    CBS_Node(std::vector<sPath> _paths = {}, CBS_Node* _parent = nullptr, Constraint _constraint = Constraint(), double _cost = 0, int _conflicts_num = 0, int total_cons_ = 0, std::vector<bgi::rtree<value,bgi::rstar<3>>> _rtrees = {}, std::vector<std::vector<Move>> _moves = {})
+        :paths(_paths), parent(_parent), constraint(_constraint), cost(_cost), conflicts_num(_conflicts_num), total_cons(total_cons_), rtrees(_rtrees), moves(_moves)
     {
         low_level_expanded = 0;
         h = 0;
@@ -198,6 +213,8 @@ struct CBS_Node
         conflicts.clear();
         semicard_conflicts.clear();
         cardinal_conflicts.clear();
+        rtrees.clear();
+        moves.clear();
     }
 
 };
