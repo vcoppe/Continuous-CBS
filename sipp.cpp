@@ -16,8 +16,9 @@ double SIPP::dist(const Node& a, const Node& b)
     return std::sqrt(pow(a.i - b.i, 2) + pow(a.j - b.j, 2));
 }
 
-void SIPP::find_successors(Node curNode, const Map &map, std::list<Node> &succs, Heuristic &h_values, Node goal)
+void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, std::list<Node> &succs, Heuristic &h_values, Node goal)
 {
+    unsigned int n = moves.size();
     Node newNode;
     std::vector<Node> valid_moves = map.get_valid_moves(curNode.id);
     for(auto move : valid_moves)
@@ -48,6 +49,7 @@ void SIPP::find_successors(Node curNode, const Map &map, std::list<Node> &succs,
         for(auto interval: intervals)
         {
             newNode.interval_id = id;
+            newNode.conflicts = curNode.conflicts;
             id++;
             auto it = visited.find(newNode.id + newNode.interval_id * map.get_size());
             if(it != visited.end())
@@ -82,6 +84,22 @@ void SIPP::find_successors(Node curNode, const Map &map, std::list<Node> &succs,
                     h = std::max(h, fabs(h_values.get_value(newNode.id, i) - h_values.get_value(goal.id, i)));
                 newNode.f = newNode.g + h;
             }
+
+            if (rtree.size() > 0) {
+                Move newMove(curNode, newNode);
+                box box = map.get_box(newMove);
+
+                for (auto it=rtree.qbegin(bgi::intersects(box)); it != rtree.qend(); ++it) {
+                    auto k = it->second;
+                    if (k % n == this->agent.id) continue;
+                    auto otherMove = moves[k % n][k / n];
+                    if (map.check_conflict(newMove, otherMove)) {
+                        newNode.conflicts = curNode.conflicts + 1;
+                        break;
+                    }
+                }
+            }
+
             succs.push_back(newNode);
         }
     }
@@ -108,7 +126,12 @@ void SIPP::add_open(Node newNode)
             open.insert(iter, newNode);
             return;
         }
-        else if(fabs(iter->f - newNode.f) < CN_EPSILON && newNode.g + CN_EPSILON > iter->g) // if f-values are equal, compare g-values
+        else if(fabs(iter->f - newNode.f) < CN_EPSILON && newNode.conflicts < iter->conflicts)
+        {
+            open.insert(iter, newNode);
+            return;
+        }
+        else if(fabs(iter->f - newNode.f) < CN_EPSILON && newNode.conflicts == iter->conflicts && newNode.g + CN_EPSILON > iter->g) // if f-values are equal, compare g-values
         {
             open.insert(iter, newNode);
             return;
@@ -251,7 +274,7 @@ Path SIPP::add_part(Path result, Path part)
     return result;
 }
 
-std::vector<Path> SIPP::find_partial_path(std::vector<Node> starts, std::vector<Node> goals, const Map &map, Heuristic &h_values, double max_f)
+std::vector<Path> SIPP::find_partial_path(std::vector<Node> starts, std::vector<Node> goals, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, Heuristic &h_values, double max_f)
 {
     open.clear();
     close.clear();
@@ -294,7 +317,7 @@ std::vector<Path> SIPP::find_partial_path(std::vector<Node> starts, std::vector<
         }
         std::list<Node> succs;
         succs.clear();
-        find_successors(curNode, map, succs, h_values, Node(goals[0].id, 0, 0, goals[0].i, goals[0].j));
+        find_successors(curNode, map, rtree, moves, succs, h_values, Node(goals[0].id, 0, 0, goals[0].i, goals[0].j));
         std::list<Node>::iterator it = succs.begin();
         while(it != succs.end())
         {
@@ -319,7 +342,7 @@ std::vector<Node> SIPP::get_endpoints(int node_id, double node_i, double node_j,
         return nodes;
     else
         for(unsigned int k = 0; k < collision_intervals[node_id].size(); k++)
-        {    
+        {
             unsigned int i(0);
             while(i < nodes.size())
             {
@@ -376,7 +399,7 @@ double SIPP::check_endpoint(Node start, Node goal)
         return start.g + cost;
 }
 
-Path SIPP::find_path(Agent agent, const Map &map, std::list<Constraint> cons, Heuristic &h_values)
+Path SIPP::find_path(Agent agent, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, std::list<Constraint> cons, Heuristic &h_values)
 {
     this->clear();
     this->agent = agent;
@@ -407,7 +430,7 @@ Path SIPP::find_path(Agent agent, const Map &map, std::list<Constraint> cons, He
             }
             if(goals.empty())
                 return Path();
-            parts = find_partial_path(starts, goals, map, h_values, goals.back().interval.second);
+            parts = find_partial_path(starts, goals, map, rtree, moves, h_values, goals.back().interval.second);
             expanded += int(close.size());
             new_results.clear();
             if(i == 0)
@@ -489,7 +512,7 @@ Path SIPP::find_path(Agent agent, const Map &map, std::list<Constraint> cons, He
     {
         starts = {get_endpoints(agent.start_id, agent.start_i, agent.start_j, 0, CN_INFINITY).at(0)};
         goals = {get_endpoints(agent.goal_id, agent.goal_i, agent.goal_j, 0, CN_INFINITY).back()};
-        parts = find_partial_path(starts, goals, map, h_values);
+        parts = find_partial_path(starts, goals, map, rtree, moves, h_values);
         expanded = int(close.size());
         if(parts[0].cost < 0)
             return Path();

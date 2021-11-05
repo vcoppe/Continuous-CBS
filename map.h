@@ -39,6 +39,8 @@ public:
     std::vector<Node> get_valid_moves(int id) const;
     void print_map();
     void printPPM();
+    box get_box(Move move) const;
+    bool check_conflict(Move move1, Move move2) const;
 };
 
 #endif // MAP_H

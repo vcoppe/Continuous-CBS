@@ -14,8 +14,23 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/geometries/point_xyz.hpp>
+#include <boost/iterator/function_output_iterator.hpp>
+
 using boost::multi_index_container;
 using namespace boost::multi_index;
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+typedef bg::model::d3::point_xyz<double> point;
+typedef bg::model::box<point> box;
+typedef std::pair<box,unsigned> value;
+
+typedef bgi::rtree<value,bgi::rstar<3>> RTree;
 
 struct Agent
 {
@@ -38,13 +53,13 @@ struct gNode
 
 struct Node
 {
-    int     id;
+    int     id, conflicts;
     double  f, g, i, j;
     Node*   parent;
     std::pair<double, double> interval;
     int interval_id;
-    Node(int _id = -1, double _f = -1, double _g = -1, double _i = -1, double _j = -1, Node* _parent = nullptr, double begin = -1, double end = -1)
-        :id(_id), f(_f), g(_g), i(_i), j(_j), parent(_parent), interval(std::make_pair(begin, end)) {interval_id = 0;}
+    Node(int _id = -1, double _f = -1, double _g = -1, double _i = -1, double _j = -1, Node* _parent = nullptr, double begin = -1, double end = -1, int _conflicts = 0)
+        :id(_id), conflicts(_conflicts), f(_f), g(_g), i(_i), j(_j), parent(_parent), interval(std::make_pair(begin, end)) {interval_id = 0;}
     bool operator <(const Node& other) const //required for heuristic calculation
     {
         return this->g < other.g;
@@ -169,6 +184,8 @@ struct Conflict
 struct CBS_Node
 {
     std::vector<sPath> paths;
+    std::shared_ptr<RTree> rtree;
+    std::vector<std::vector<Move>> moves;
     CBS_Node* parent;
     Constraint constraint;
     Constraint positive_constraint;
@@ -182,8 +199,8 @@ struct CBS_Node
     std::list<Conflict> conflicts;
     std::list<Conflict> semicard_conflicts;
     std::list<Conflict> cardinal_conflicts;
-    CBS_Node(std::vector<sPath> _paths = {}, CBS_Node* _parent = nullptr, Constraint _constraint = Constraint(), double _cost = 0, int _conflicts_num = 0, int total_cons_ = 0)
-        :paths(_paths), parent(_parent), constraint(_constraint), cost(_cost), conflicts_num(_conflicts_num), total_cons(total_cons_)
+    CBS_Node(std::vector<sPath> _paths = {}, std::shared_ptr<RTree> _rtree = nullptr, std::vector<std::vector<Move>> _moves = {}, CBS_Node* _parent = nullptr, Constraint _constraint = Constraint(), double _cost = 0, int _conflicts_num = 0, int total_cons_ = 0)
+        :paths(_paths), rtree(_rtree), moves(_moves), parent(_parent), constraint(_constraint), cost(_cost), conflicts_num(_conflicts_num), total_cons(total_cons_)
     {
         low_level_expanded = 0;
         h = 0;
@@ -195,6 +212,8 @@ struct CBS_Node
     {
         parent = nullptr;
         paths.clear();
+        if (rtree) rtree->clear();
+        moves.clear();
         conflicts.clear();
         semicard_conflicts.clear();
         cardinal_conflicts.clear();
@@ -426,19 +445,6 @@ public:
         if (p1 == p2)
             return 6;//DESTINATION;
         return 7;//BETWEEN;
-    }
-};
-
-struct Box {
-    double min[3], max[3];
-
-    Box(double min_i, double min_j, double min_t, double max_i, double max_j, double max_t) {
-        min[0] = min_i;
-        min[1] = min_j;
-        min[2] = min_t;
-        max[0] = max_i;
-        max[1] = max_j;
-        max[2] = max_t;
     }
 };
 

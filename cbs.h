@@ -9,18 +9,6 @@
 #include "heuristic.h"
 #include "simplex/simplex.h"
 #include "simplex/pilal.h"
-#include <boost/geometry.hpp>
-#include <boost/geometry/index/rtree.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/geometries/point_xyz.hpp>
-#include <boost/iterator/function_output_iterator.hpp>
-
-namespace bg = boost::geometry;
-namespace bgi = boost::geometry::index;
-
-typedef bg::model::d3::point_xyz<double> point;
-typedef bg::model::box<point> box;
-typedef std::pair<box,unsigned> value;
 
 class CBS
 {
@@ -33,9 +21,8 @@ public:
     bool validate_constraints(std::list<Constraint> constraints, int agent);
     bool check_positive_constraints(std::list<Constraint> constraints, Constraint constraint);
     Conflict check_paths(const sPath &pathA, const sPath &pathB);
-    bool check_conflict(Move move1, Move move2);
     double get_hl_heuristic(const std::list<Conflict> &conflicts);
-    std::vector<Conflict> get_all_conflicts(const std::vector<sPath> &paths, int id);
+    std::vector<Conflict> get_all_conflicts(CBS_Node &node, const std::vector<sPath> &paths, int id);
     Constraint get_constraint(int agent, Move move1, Move move2);
     Constraint get_wait_constraint(int agent, Move move1, Move move2);
     void find_new_conflicts(const Map &map, const Task &task, CBS_Node &node, std::vector<sPath> &paths, const sPath &path,
@@ -44,13 +31,14 @@ public:
     double get_cost(CBS_Node node, int agent_id);
     std::vector<sPath> get_paths(CBS_Node *node, unsigned int agents_size);
     Conflict get_conflict(std::list<Conflict> &conflicts);
-    box get_box(Move move);
     CBS_Tree tree;
     SIPP planner;
     Solution solution;
     Heuristic h_values;
     Config config;
     const Map* map;
+    const RTree empty_rtree;
+    const std::vector<std::vector<Move>> empty_moves;
 
 };
 
