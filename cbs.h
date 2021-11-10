@@ -15,7 +15,7 @@ class CBS
 public:
     CBS() {}
     Solution find_solution(const Map &map, const Task &task, const Config &cfg);
-    bool init_root(const Map &map, const Task &tas, std::shared_ptr<RTree> &rtree, std::vector<std::vector<Move>> &moves);
+    bool init_root(const Map &map, const Task &task);
     std::list<Constraint> get_constraints(CBS_Node *node, int agent_id = -1);
     //std::list<Constraint> merge_constraints(std::list<Constraint> constraints);
     bool validate_constraints(std::list<Constraint> constraints, int agent);
@@ -31,7 +31,7 @@ public:
     double get_cost(CBS_Node node, int agent_id);
     std::vector<sPath> get_paths(CBS_Node *node, unsigned int agents_size);
     Conflict get_conflict(std::list<Conflict> &conflicts);
-    void get_RTree(std::vector<sPath> &paths, std::shared_ptr<RTree> &rtree, std::vector<std::vector<Move>> &moves, unsigned int n);
+    void fill_RTree(CBS_Node &node, sPath &path, unsigned int id, unsigned int n);
     CBS_Tree tree;
     SIPP planner;
     Solution solution;

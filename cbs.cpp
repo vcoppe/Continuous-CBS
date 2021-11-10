@@ -1,8 +1,10 @@
 #include "cbs.h"
 
-bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &rtree, std::vector<std::vector<Move>> &moves)
+bool CBS::init_root(const Map &map, const Task &task)
 {
     CBS_Node root;
+    root.rtree = std::make_shared<RTree>();
+    root.moves.resize(task.get_agents_size());
     tree.set_focal_weight(config.focal_weight);
     sPath path;
 
@@ -10,13 +12,13 @@ bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &rt
     {
         Agent agent = task.get_agent(i);
         if (i == 0) path = planner.find_path(agent, map, empty_rtree, empty_moves, {}, h_values);
-        else path = planner.find_path(agent, map, *rtree, moves, {}, h_values);
+        else path = planner.find_path(agent, map, *(root.rtree), root.moves, {}, h_values);
         if(path.cost < 0)
             return false;
         root.paths.push_back(path);
         root.cost += path.cost;
 
-        get_RTree(root.paths, rtree, moves, task.get_agents_size());
+        fill_RTree(root, path, i, task.get_agents_size());
     }
     root.low_level_expanded = 0;
     root.parent = nullptr;
@@ -49,22 +51,35 @@ bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &rt
     return true;
 }
 
-void CBS::get_RTree(std::vector<sPath> &paths, std::shared_ptr<RTree> &rtree, std::vector<std::vector<Move>> &moves, unsigned int n) {
-    std::vector<value> values;
+void CBS::fill_RTree(CBS_Node &node, sPath &path, unsigned int id, unsigned int n) {
+    auto nodes = path.nodes;
+    auto &moves = node.moves[id];
+    unsigned int length = std::max(nodes.size(), moves.size());
+    bool same = true;
 
-    for (unsigned int i=0; i<paths.size(); i++) {
-        auto nodes = paths[i].nodes;
-        std::vector<Move> agent_moves;
-        for (unsigned int j=0; j<nodes.size(); j++) {
+    for (unsigned int j=0; j<length; j++) {
+        if (j >= nodes.size()) {
+            auto old_box = map->get_box(moves[j]);
+            node.rtree->remove({old_box, id + n * j});
+        } else if (j >= moves.size()) {
             auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
             auto box = map->get_box(move);
-            values.emplace_back(box, i + n * j);
-            agent_moves.push_back(move);
-        }
-        moves[i] = agent_moves;
-    }
+            moves.push_back(move);
+            node.rtree->insert({box, id + n * j});
+        } else {
+            auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
 
-    rtree = std::make_shared<RTree>(values);
+            if (same && j < moves.size() && move.id1 == moves[j].id1 && move.id2 == moves[j].id2) continue;
+            else same = false;
+
+            auto old_box = map->get_box(moves[j]);
+            node.rtree->remove({old_box, id + n * j});
+            moves[j] = move;
+
+            auto box = map->get_box(move);
+            node.rtree->insert({box, id + n * j});
+        }
+    }
 }
 
 Constraint CBS::get_wait_constraint(int agent, Move move1, Move move2)
@@ -236,9 +251,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
     }
     auto t = std::chrono::high_resolution_clock::now();
     int cardinal_solved = 0, semicardinal_solved = 0;
-    std::shared_ptr<RTree> rtree;
-    std::vector<std::vector<Move>> moves(task.get_agents_size());
-    if(!this->init_root(map, task, rtree, moves))
+    if(!this->init_root(map, task))
         return solution;
     solution.init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t);
     solution.found = true;
@@ -287,15 +300,13 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         time += time_spent.count();
         expanded++;
 
-        get_RTree(paths, rtree, moves, task.get_agents_size());
-
         std::list<Constraint> constraintsA = get_constraints(&node, conflict.agent1);
         Constraint constraintA(get_constraint(conflict.agent1, conflict.move1, conflict.move2));
         constraintsA.push_back(constraintA);
         sPath pathA;
         //if(!config.use_cardinal || !config.cache_paths)
         {
-            pathA = planner.find_path(task.get_agent(conflict.agent1), map, *rtree, moves, constraintsA, h_values);
+            pathA = planner.find_path(task.get_agent(conflict.agent1), map, *(node.rtree), node.moves, constraintsA, h_values);
             low_level_searches++;
             low_level_expanded += pathA.expanded;
         }
@@ -308,7 +319,7 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
         sPath pathB;
         //if(!config.use_cardinal || !config.cache_paths)
         {
-            pathB = planner.find_path(task.get_agent(conflict.agent2), map, *rtree, moves, constraintsB, h_values);
+            pathB = planner.find_path(task.get_agent(conflict.agent2), map, *(node.rtree), node.moves, constraintsB, h_values);
             low_level_searches++;
             low_level_expanded += pathB.expanded;
         }
@@ -317,6 +328,16 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
 
         CBS_Node right({pathA}, parent, constraintA, node.cost + pathA.cost - get_cost(node, conflict.agent1), 0, node.total_cons + 1);
         CBS_Node left({pathB}, parent, constraintB, node.cost + pathB.cost - get_cost(node, conflict.agent2), 0, node.total_cons + 1);
+
+        right.rtree = std::make_shared<RTree>(*(node.rtree)); // copy
+        right.moves = std::vector<std::vector<Move>>(node.moves);
+        left.rtree = node.rtree; // move
+        left.moves = std::vector<std::vector<Move>>(node.moves);
+        node.rtree.reset();
+
+        fill_RTree(right, pathA, conflict.agent1, task.get_agents_size());
+        fill_RTree(left, pathB, conflict.agent2, task.get_agents_size());
+
         Constraint positive;
         bool inserted = false;
         bool left_ok = true, right_ok = true;
