@@ -429,3 +429,53 @@ bool Map::check_line(int x1, int y1, int x2, int y2)
     }
     return true;
 }
+
+box Map::get_box(Move move) const
+{
+    return box(point(
+        std::min(get_i(move.id1), get_i(move.id2)) - CN_AGENT_SIZE,
+        std::min(get_j(move.id1), get_j(move.id2)) - CN_AGENT_SIZE,
+        move.t1
+    ), point(
+        std::max(get_i(move.id1), get_i(move.id2)) + CN_AGENT_SIZE,
+        std::max(get_j(move.id1), get_j(move.id2)) + CN_AGENT_SIZE,
+        move.t2
+    ));
+}
+
+bool Map::check_conflict(Move move1, Move move2) const
+{
+    double startTimeA(move1.t1), endTimeA(move1.t2), startTimeB(move2.t1), endTimeB(move2.t2);
+    int m1i1(get_i(move1.id1)), m1i2(get_i(move1.id2)), m1j1(get_j(move1.id1)), m1j2(get_j(move1.id2));
+    int m2i1(get_i(move2.id1)), m2i2(get_i(move2.id2)), m2j1(get_j(move2.id1)), m2j2(get_j(move2.id2));
+    Vector2D A(m1i1, m1j1);
+    Vector2D B(m2i1, m2j1);
+    Vector2D VA((m1i2 - m1i1)/(move1.t2 - move1.t1), (m1j2 - m1j1)/(move1.t2 - move1.t1));
+    Vector2D VB((m2i2 - m2i1)/(move2.t2 - move2.t1), (m2j2 - m2j1)/(move2.t2 - move2.t1));
+    if(startTimeB > startTimeA)
+    {
+        A += VA*(startTimeB-startTimeA);
+        startTimeA = startTimeB;
+    }
+    else if(startTimeB < startTimeA)
+    {
+        B += VB*(startTimeA - startTimeB);
+        startTimeB = startTimeA;
+    }
+    double r(2*CN_AGENT_SIZE);
+    Vector2D w(B - A);
+    double c(w*w - r*r);
+    if(c < 0)
+        return true;
+
+    Vector2D v(VA - VB);
+    double a(v*v);
+    double b(w*v);
+    double dscr(b*b - a*c);
+    if(dscr - CN_EPSILON < 0)
+        return false;
+    double ctime = (b - sqrt(dscr))/a;
+    if(ctime > -CN_EPSILON && ctime < std::min(endTimeB,endTimeA) - startTimeA + CN_EPSILON)
+        return true;
+    return false;
+}

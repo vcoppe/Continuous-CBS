@@ -14,8 +14,23 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/geometries/point_xyz.hpp>
+#include <boost/iterator/function_output_iterator.hpp>
+
 using boost::multi_index_container;
 using namespace boost::multi_index;
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+typedef bg::model::d3::point_xyz<double> point;
+typedef bg::model::box<point> box;
+typedef std::pair<box,unsigned> value;
+
+typedef bgi::rtree<value,bgi::rstar<3>> RTree;
 
 struct Agent
 {
@@ -38,13 +53,13 @@ struct gNode
 
 struct Node
 {
-    int     id;
+    int     id, conflicts;
     double  f, g, i, j;
     Node*   parent;
     std::pair<double, double> interval;
     int interval_id;
-    Node(int _id = -1, double _f = -1, double _g = -1, double _i = -1, double _j = -1, Node* _parent = nullptr, double begin = -1, double end = -1)
-        :id(_id), f(_f), g(_g), i(_i), j(_j), parent(_parent), interval(std::make_pair(begin, end)) {interval_id = 0;}
+    Node(int _id = -1, double _f = -1, double _g = -1, double _i = -1, double _j = -1, Node* _parent = nullptr, double begin = -1, double end = -1, int _conflicts = 0)
+        :id(_id), conflicts(_conflicts), f(_f), g(_g), i(_i), j(_j), parent(_parent), interval(std::make_pair(begin, end)) {interval_id = 0;}
     bool operator <(const Node& other) const //required for heuristic calculation
     {
         return this->g < other.g;
