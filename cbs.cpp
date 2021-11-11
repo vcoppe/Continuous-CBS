@@ -57,8 +57,8 @@ void CBS::get_RTree(std::vector<sPath> &paths, std::shared_ptr<RTree> &rtree, st
         std::vector<Move> agent_moves;
         for (unsigned int j=0; j<nodes.size(); j++) {
             auto move = (j == nodes.size()-1) ? Move(nodes[j].g, CN_INFINITY, nodes[j].id, nodes[j].id) : Move(nodes[j], nodes[j+1]);
-            auto box = map->get_box(move);
-            values.emplace_back(box, i + n * j);
+            auto segment = map->get_segment(move);
+            values.emplace_back(segment, i + n * j);
             agent_moves.push_back(move);
         }
         moves[i] = agent_moves;

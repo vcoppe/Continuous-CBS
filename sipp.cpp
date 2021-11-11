@@ -87,7 +87,7 @@ void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, con
 
             if (rtree.size() > 0) {
                 Move newMove(curNode, newNode);
-                box box = map.get_box(newMove);
+                auto box = map.get_box(newMove);
 
                 for (auto it=rtree.qbegin(bgi::intersects(box)); it != rtree.qend(); ++it) {
                     auto k = it->second;

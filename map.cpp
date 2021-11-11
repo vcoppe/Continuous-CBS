@@ -433,14 +433,22 @@ bool Map::check_line(int x1, int y1, int x2, int y2)
 box Map::get_box(Move move) const
 {
     return box(point(
-        std::min(get_i(move.id1), get_i(move.id2)) - CN_AGENT_SIZE,
-        std::min(get_j(move.id1), get_j(move.id2)) - CN_AGENT_SIZE,
+        std::min(get_i(move.id1), get_i(move.id2)) - 2 * CN_AGENT_SIZE,
+        std::min(get_j(move.id1), get_j(move.id2)) - 2 * CN_AGENT_SIZE,
         move.t1
     ), point(
-        std::max(get_i(move.id1), get_i(move.id2)) + CN_AGENT_SIZE,
-        std::max(get_j(move.id1), get_j(move.id2)) + CN_AGENT_SIZE,
+        std::max(get_i(move.id1), get_i(move.id2)) + 2 * CN_AGENT_SIZE,
+        std::max(get_j(move.id1), get_j(move.id2)) + 2 * CN_AGENT_SIZE,
         move.t2
     ));
+}
+
+segment Map::get_segment(Move move) const
+{
+    return segment(
+        point(get_i(move.id1), get_j(move.id1), move.t1),
+        point(get_i(move.id2), get_j(move.id2), move.t2)
+    );
 }
 
 bool Map::check_conflict(Move move1, Move move2) const
