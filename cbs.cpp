@@ -1,7 +1,7 @@
 #include "cbs.h"
 #include <boost/geometry/index/detail/rtree/utilities/print.hpp>
 
-bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &r_tree, std::vector<std::vector<Move>> &moves)
+bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &rtree, std::vector<std::vector<Move>> &moves)
 {
     CBS_Node root;
     tree.set_focal_weight(config.focal_weight);
@@ -11,13 +11,13 @@ bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &r_
     {
         Agent agent = task.get_agent(i);
         if (i == 0) path = planner.find_path(agent, map, empty_rtree, empty_moves, {}, h_values);
-        else path = planner.find_path(agent, map, *r_tree, moves, {}, h_values);
+        else path = planner.find_path(agent, map, *rtree, moves, {}, h_values);
         if(path.cost < 0)
             return false;
         root.paths.push_back(path);
         root.cost += path.cost;
 
-        get_RTree(root.paths, r_tree, moves, task.get_agents_size());
+        get_RTree(root.paths, rtree, moves, task.get_agents_size());
     }
     root.low_level_expanded = 0;
     root.parent = nullptr;
@@ -25,8 +25,6 @@ bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &r_
     root.id_str = "1";
     auto conflicts = get_all_conflicts(root.paths, -1);
     root.conflicts_num = conflicts.size();
-
-    bgi::detail::rtree::utilities::print(std::cout, *r_tree);
 
     for(auto conflict: conflicts)
         if(!config.use_cardinal)
@@ -243,8 +241,6 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
     std::vector<std::vector<Move>> moves(task.get_agents_size());
     if(!this->init_root(map, task, rtree, moves))
         return solution;
-    else
-        return solution;
     solution.init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t);
     solution.found = true;
     CBS_Node node;
@@ -425,6 +421,9 @@ Solution CBS::find_solution(const Map &map, const Task &task, const Config &cfg)
     solution.check_time = time;
     solution.cardinal_solved = cardinal_solved;
     solution.semicardinal_solved = semicardinal_solved;
+
+    get_RTree(solution.paths, rtree, moves, task.get_agents_size());
+    bgi::detail::rtree::utilities::print(std::cout, *rtree);
 
     return solution;
 }
