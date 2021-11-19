@@ -8,15 +8,13 @@ bool CBS::init_root(const Map &map, const Task &task, std::shared_ptr<RTree> &rt
 
     for(int i = 0; i < int(task.get_agents_size()); i++)
     {
+        get_RTree(root.paths, rtree, moves, task.get_agents_size());
         Agent agent = task.get_agent(i);
-        if (i == 0) path = planner.find_path(agent, map, empty_rtree, empty_moves, {}, h_values);
-        else path = planner.find_path(agent, map, *rtree, moves, {}, h_values);
+        path = planner.find_path(agent, map, *rtree, moves, {}, h_values);
         if(path.cost < 0)
             return false;
         root.paths.push_back(path);
         root.cost += path.cost;
-
-        get_RTree(root.paths, rtree, moves, task.get_agents_size());
     }
     root.low_level_expanded = 0;
     root.parent = nullptr;
