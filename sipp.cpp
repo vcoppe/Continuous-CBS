@@ -497,7 +497,9 @@ Path SIPP::find_path(Agent agent, const Map &map, const RTree &rtree, const std:
                             new_results.back().nodes.push_back(new_results.back().nodes.back());
                             new_results.back().nodes.back().g = goals[k].g - offset;
                         }
+                        int conflicts = new_results.back().nodes.back().conflicts;
                         new_results.back().nodes.push_back(goals[k]);
+                        new_results.back().nodes.back().conflicts = conflicts;
                     }
                 }
 
