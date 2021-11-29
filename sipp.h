@@ -12,13 +12,13 @@ public:
 
     SIPP()  {}
     ~SIPP() {}
-    Path find_path(Agent agent, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, std::list<Constraint> cons, Heuristic &h_values);
+    Path find_path(Agent agent, const Map &map, const std::vector<std::vector<Move>> &moves, std::list<Constraint> cons, Heuristic &h_values);
 
 private:
     Agent agent;
-    std::vector<Path> find_partial_path(std::vector<Node> starts, std::vector<Node> goals, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, Heuristic &h_values, double max_f = CN_INFINITY);
+    std::vector<Path> find_partial_path(std::vector<Node> starts, std::vector<Node> goals, const Map &map, const std::vector<std::vector<Move>> &moves, Heuristic &h_values, double max_f = CN_INFINITY);
     Path add_part(Path result, Path part);
-    void find_successors(Node curNode, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, std::list<Node> &succs, Heuristic &h_values, Node goal);
+    void find_successors(Node curNode, const Map &map, const std::vector<std::vector<Move>> &moves, std::list<Node> &succs, Heuristic &h_values, Node goal);
     void add_open(Node newNode);
     Node find_min();
     double dist(const Node &a, const Node &b);
