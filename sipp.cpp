@@ -94,8 +94,7 @@ void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, con
                     if (k % n == this->agent.id) continue;
                     auto otherMove = moves[k % n][k / n];
                     if (map.check_conflict(newMove, otherMove)) {
-                        newNode.conflicts = curNode.conflicts + 1;
-                        break;
+                        newNode.conflicts = newNode.conflicts + 1;
                     }
                 }
             }
