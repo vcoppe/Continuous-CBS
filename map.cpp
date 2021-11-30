@@ -433,13 +433,13 @@ bool Map::check_line(int x1, int y1, int x2, int y2)
 box Map::get_box(Move move) const
 {
     return box(point(
-        std::min(get_i(move.id1), get_i(move.id2)) - CN_AGENT_SIZE,
-        std::min(get_j(move.id1), get_j(move.id2)) - CN_AGENT_SIZE,
-        move.t1
+        std::min(get_i(move.id1), get_i(move.id2)) - CN_AGENT_SIZE - CN_EPSILON,
+        std::min(get_j(move.id1), get_j(move.id2)) - CN_AGENT_SIZE - CN_EPSILON,
+        move.t1 - CN_EPSILON
     ), point(
-        std::max(get_i(move.id1), get_i(move.id2)) + CN_AGENT_SIZE,
-        std::max(get_j(move.id1), get_j(move.id2)) + CN_AGENT_SIZE,
-        move.t2
+        std::max(get_i(move.id1), get_i(move.id2)) + CN_AGENT_SIZE + CN_EPSILON,
+        std::max(get_j(move.id1), get_j(move.id2)) + CN_AGENT_SIZE + CN_EPSILON,
+        move.t2 + CN_EPSILON
     ));
 }
 
