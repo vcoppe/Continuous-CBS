@@ -89,7 +89,9 @@ void SIPP::find_successors(Node curNode, const Map &map, const std::vector<std::
             auto found_conflict = false;
             for (unsigned int i=0; i<moves.size() && !found_conflict; i++) if (i != this->agent.id) {
                 for (unsigned int j=0; j<moves[i].size() && !found_conflict; j++) {
-                    if (map.check_conflict(newMove, moves[i][j])) {
+                    if (newMove.t1 < moves[i][j].t2 + CN_EPSILON &&
+                        newMove.t2 + CN_EPSILON > moves[i][j].t1 &&
+                        map.check_conflict(newMove, moves[i][j])) {
                         newNode.conflicts = newNode.conflicts + 1;
                         found_conflict = true;
                     }
