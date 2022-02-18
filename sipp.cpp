@@ -19,7 +19,11 @@ double SIPP::dist(const Node& a, const Node& b)
 void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, const std::vector<std::vector<Move>> &moves, std::list<Node> &succs, Heuristic &h_values, Node goal)
 {
     unsigned int n = moves.size();
-    Node newNode;
+    Node intermediateNode, newNode;
+    std::vector<Move> newMoves;
+    intermediateNode.i = curNode.i;
+    intermediateNode.j = curNode.j;
+    intermediateNode.id = curNode.id;
     std::vector<Node> valid_moves = map.get_valid_moves(curNode.id);
     for(auto move : valid_moves)
     {
@@ -86,17 +90,26 @@ void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, con
             }
 
             if (rtree.size() > 0) {
-                Move newMove(curNode, newNode);
-                box box = map.get_box(newMove);
+                newMoves.clear();
+                if (newNode.g - curNode.g > cost + CN_EPSILON) { // also a wait move
+                    intermediateNode.g = newNode.g - cost;
+                    newMoves.emplace_back(curNode, intermediateNode);
+                    newMoves.emplace_back(intermediateNode, newNode);
+                } else newMoves.emplace_back(curNode, newNode);
 
-                for (auto it=rtree.qbegin(bgi::intersects(box)); it != rtree.qend(); ++it) {
-                    auto k = it->second;
-                    if (k % n == this->agent.id) continue;
-                    auto otherMove = moves[k % n][k / n];
-                    if (map.check_conflict(newMove, otherMove)) {
-                        newNode.conflicts = curNode.conflicts + 1;
-                        break;
+                for (auto newMove : newMoves) {
+                    box box = map.get_box(newMove);
+                    for (auto it=rtree.qbegin(bgi::intersects(box)); it != rtree.qend(); ++it) {
+                        auto k = it->second;
+                        if (k % n == this->agent.id) continue;
+                        auto otherMove = moves[k % n][k / n];
+                        if (map.check_conflict(newMove, otherMove)) {
+                            newNode.conflicts = curNode.conflicts + 1;
+                            break;
+                        }
                     }
+
+                    if (newNode.conflicts == curNode.conflicts + 1) break;
                 }
             }
 
