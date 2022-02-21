@@ -108,8 +108,6 @@ void SIPP::find_successors(Node curNode, const Map &map, const RTree &rtree, con
                             break;
                         }
                     }
-
-                    if (newNode.conflicts == curNode.conflicts + 1) break;
                 }
             }
 
