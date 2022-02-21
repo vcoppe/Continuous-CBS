@@ -19,7 +19,11 @@ double SIPP::dist(const Node& a, const Node& b)
 void SIPP::find_successors(Node curNode, const Map &map, const std::vector<std::vector<Move>> &moves, std::list<Node> &succs, Heuristic &h_values, Node goal)
 {
     unsigned int n = moves.size();
-    Node newNode;
+    Node intermediateNode, newNode;
+    std::vector<Move> newMoves;
+    intermediateNode.i = curNode.i;
+    intermediateNode.j = curNode.j;
+    intermediateNode.id = curNode.id;
     std::vector<Node> valid_moves = map.get_valid_moves(curNode.id);
     for(auto move : valid_moves)
     {
@@ -85,15 +89,23 @@ void SIPP::find_successors(Node curNode, const Map &map, const std::vector<std::
                 newNode.f = newNode.g + h;
             }
 
-            Move newMove(curNode, newNode);
-            auto found_conflict = false;
-            for (unsigned int i=0; i<moves.size() && !found_conflict; i++) if (i != this->agent.id) {
-                for (unsigned int j=0; j<moves[i].size() && !found_conflict; j++) {
-                    if (newMove.t1 < moves[i][j].t2 + CN_EPSILON &&
-                        newMove.t2 + CN_EPSILON > moves[i][j].t1 &&
-                        map.check_conflict(newMove, moves[i][j])) {
-                        newNode.conflicts = newNode.conflicts + 1;
-                        found_conflict = true;
+            newMoves.clear();
+            if (newNode.g - curNode.g > cost + CN_EPSILON) { // also a wait move
+                intermediateNode.g = newNode.g - cost;
+                newMoves.emplace_back(curNode, intermediateNode);
+                newMoves.emplace_back(intermediateNode, newNode);
+            } else newMoves.emplace_back(curNode, newNode);
+
+            for (auto newMove : newMoves) {
+                auto found_conflict = false;
+                for (unsigned int i=0; i<moves.size() && !found_conflict; i++) if (i != this->agent.id) {
+                    for (unsigned int j=0; j<moves[i].size() && !found_conflict; j++) {
+                        if (newMove.t1 < moves[i][j].t2 + CN_EPSILON &&
+                            newMove.t2 + CN_EPSILON > moves[i][j].t1 &&
+                            map.check_conflict(newMove, moves[i][j])) {
+                            newNode.conflicts = newNode.conflicts + 1;
+                            found_conflict = true;
+                        }
                     }
                 }
             }
