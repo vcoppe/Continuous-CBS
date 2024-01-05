@@ -64,7 +64,7 @@ bool CBS::check_conflict(Move move1, Move move2)
         B += VB*(startTimeA - startTimeB);
         startTimeB = startTimeA;
     }
-    double r(2*CN_AGENT_SIZE);
+    double r(2*config.agent_size);
     Vector2D w(B - A);
     double c(w*w - r*r);
     if(c < 0)
@@ -227,10 +227,10 @@ Conflict CBS::get_conflict(std::list<Conflict> &conflicts)
     {
         if(it->overcost > 0)
         {
-            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t < it->t))
+            if(best_it->overcost < it->overcost || (fabs(best_it->overcost - it->overcost) < CN_EPSILON && best_it->t > it->t))
                 best_it = it;
         }
-        else if(best_it->t < it->t)
+        else if(best_it->t > it->t)
             best_it = it;
     }
 
@@ -612,19 +612,19 @@ Conflict CBS::check_paths(const sPath &pathA, const sPath &pathB)
         double dist = sqrt(pow(map->get_i(nodesA[a].id) - map->get_i(nodesB[b].id), 2) + pow(map->get_j(nodesA[a].id) - map->get_j(nodesB[b].id), 2)) - CN_EPSILON;
         if(a < nodesA.size() - 1 && b < nodesB.size() - 1) // if both agents have not reached their goals yet
         {
-            if(dist < (nodesA[a+1].g - nodesA[a].g) + (nodesB[b+1].g - nodesB[b].g) + CN_AGENT_SIZE*2)
+            if(dist < (nodesA[a+1].g - nodesA[a].g) + (nodesB[b+1].g - nodesB[b].g) + config.agent_size*2)
                 if(check_conflict(Move(nodesA[a], nodesA[a+1]), Move(nodesB[b], nodesB[b+1])))
                     return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a], nodesA[a+1]), Move(nodesB[b], nodesB[b+1]), std::min(nodesA[a].g, nodesB[b].g));
         }
         else if(a == nodesA.size() - 1) // if agent A has already reached the goal
         {
-            if(dist < (nodesB[b+1].g - nodesB[b].g) + CN_AGENT_SIZE*2)
+            if(dist < (nodesB[b+1].g - nodesB[b].g) + config.agent_size*2)
                 if(check_conflict(Move(nodesA[a].g, CN_INFINITY, nodesA[a].id, nodesA[a].id), Move(nodesB[b], nodesB[b+1])))
                     return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a].g, CN_INFINITY, nodesA[a].id, nodesA[a].id), Move(nodesB[b], nodesB[b+1]), std::min(nodesA[a].g, nodesB[b].g));
         }
         else if(b == nodesB.size() - 1) // if agent B has already reached the goal
         {
-            if(dist < (nodesA[a+1].g - nodesA[a].g) + CN_AGENT_SIZE*2)
+            if(dist < (nodesA[a+1].g - nodesA[a].g) + config.agent_size*2)
                 if(check_conflict(Move(nodesA[a], nodesA[a+1]), Move(nodesB[b].g, CN_INFINITY, nodesB[b].id, nodesB[b].id)))
                     return Conflict(pathA.agentID, pathB.agentID, Move(nodesA[a], nodesA[a+1]), Move(nodesB[b].g, CN_INFINITY, nodesB[b].id, nodesB[b].id), std::min(nodesA[a].g, nodesB[b].g));
         }
